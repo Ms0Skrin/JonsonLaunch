@@ -18,7 +18,8 @@ final class Prefs {
             NIGHT = "night", NET = "net", INTRO = "intro", OPACITY = "opacity",
             FOCUS_OPACITY = "focus_opacity", AUTO_UPDATE = "auto_update", UPDATE_AT = "update_at",
             QUOTES = "quotes_every", QUOTE = "quote", QUOTE_AT = "quote_at",
-            SFX = "sfx", SFX_VOL = "sfx_vol";
+            SFX = "sfx", SFX_VOL = "sfx_vol",
+            SLEEP_AT = "sleep_at", SLEEP_BTN = "sleep_btn";
 
     static final String[] BG_NAMES = {"Аврора", "Закат", "Океан", "Лес", "Графит", "От приложения",
             "Абстракция", "Пейзажи", "Автомобили", "Животные", "Города", "Люди"};

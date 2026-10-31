@@ -109,7 +109,7 @@ public class MainActivity extends Activity {
     private ImageView artView, washBack, washFront;
     private FrameLayout washBox, content;
     private View topBar, gridBg;
-    private Widgets.Pill searchPill, netPill;
+    private Widgets.Pill searchPill, netPill, sleepPill, updatePill;
     private TextView title, clock, date, caption, netBadge, quoteText, quoteAuthor;
     private LinearLayout quoteBox;
     private String[] quote;
@@ -147,6 +147,8 @@ public class MainActivity extends Activity {
                 if (prefs.on(Prefs.INTRO, true)) hideForIntro();
                 // ТВ выключили — самое время тихо поставить скачанное обновление
                 if (prefs.on(Prefs.AUTO_UPDATE, true)) Updater.installOnScreenOff(MainActivity.this);
+                // Выключили сами — таймер сна больше не нужен
+                if (SleepTimer.minutesLeft(MainActivity.this) > 0) SleepTimer.set(MainActivity.this, 0);
             } else if (resumed) {
                 maybeIntro();
             }
@@ -163,6 +165,8 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = new Prefs(this);
+        Journal.init(this);
+        Updater.changed = new Runnable() { @Override public void run() { refreshUpdatePill(); } };
         sounds = new Sounds(this);
         dp = getResources().getDisplayMetrics().density;
         setContentView(buildUi());
@@ -208,6 +212,8 @@ public class MainActivity extends Activity {
         maybeIntro();
         artView.post(new Runnable() { @Override public void run() { drift(); } });
         rotatePicture.run();
+        updateSleepPill();
+        refreshUpdatePill();
         // Тихая проверка обновлений: скачается сейчас, поставится, когда лаунчер уйдёт с экрана
         if (prefs.on(Prefs.AUTO_UPDATE, true)
                 && System.currentTimeMillis() - prefs.time(Prefs.UPDATE_AT) > Updater.CHECK_EVERY) {
@@ -401,6 +407,26 @@ public class MainActivity extends Activity {
             @Override public void onClick(View v) { openNetworkSettings(); }
         });
         pills.addView(netPill, new LinearLayout.LayoutParams(px(38), px(38)));
+        // Таймер сна: OK переключает 15 → 30 → 60 → 90 → 120 мин → выкл; в подписи — сколько осталось
+        sleepPill = new Widgets.Pill(this, Widgets.Pill.MOON, null);
+        sleepPill.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                SleepTimer.set(MainActivity.this, SleepTimer.next(MainActivity.this));
+                updateSleepPill();
+            }
+        });
+        LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(-2, px(38));
+        mlp.leftMargin = px(12);
+        pills.addView(sleepPill, mlp);
+        // Скачано обновление: OK — поставить сразу, не дожидаясь выключения ТВ
+        updatePill = new Widgets.Pill(this, Widgets.Pill.UPDATE, "Обновить");
+        updatePill.setVisibility(View.GONE);
+        updatePill.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { installUpdateNow(); }
+        });
+        LinearLayout.LayoutParams ulp = new LinearLayout.LayoutParams(-2, px(38));
+        ulp.leftMargin = px(12);
+        pills.addView(updatePill, ulp);
         top.addView(pills, new FrameLayout.LayoutParams(-2, -2, Gravity.START | Gravity.TOP));
 
         LinearLayout clockBox = new LinearLayout(this);
@@ -561,6 +587,7 @@ public class MainActivity extends Activity {
         clock.setVisibility(prefs.on(Prefs.CLOCK, true) ? View.VISIBLE : View.GONE);
         date.setVisibility(prefs.on(Prefs.DATE, true) ? View.VISIBLE : View.GONE);
         searchPill.setVisibility(prefs.on(Prefs.SEARCH, true) ? View.VISIBLE : View.GONE);
+        updateSleepPill();
         boolean quotes = Prefs.QUOTE_MS[prefs.pick(Prefs.QUOTES, Prefs.QUOTE_DEF, Prefs.QUOTE_MS.length)] >= 0;
         quoteBox.setVisibility(quotes ? View.VISIBLE : View.GONE);
         if (quotes && quote == null) nextQuote();
@@ -576,6 +603,7 @@ public class MainActivity extends Activity {
         // Включили или выключили смену картинок — таймер подхватит сразу
         handler.post(rotatePicture);
         if (night >= 0) applyNight(true);
+        updateSleepPill();
         if (netCallback != null && Build.VERSION.SDK_INT >= 24) {
             ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
             Network active = cm.getActiveNetwork();
@@ -947,6 +975,47 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void updateSleepPill() {
+        if (sleepPill == null) return;
+        int left = SleepTimer.minutesLeft(this);
+        sleepPill.setLabel(left > 0 ? left + " мин" : null);
+        sleepPill.setVisibility(prefs.on(Prefs.SLEEP_BTN, true) || left > 0 ? View.VISIBLE : View.GONE);
+    }
+
+    /** Есть ли скачанное обновление — проверка подписи читает APK, поэтому не в UI-потоке. */
+    private void refreshUpdatePill() {
+        final Context c = getApplicationContext();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final boolean has = Updater.hasPending(c);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (!has && updatePill.isFocused()) searchPill.requestFocus();
+                        updatePill.setLabel("Обновить");
+                        updatePill.setVisibility(has ? View.VISIBLE : View.GONE);
+                    }
+                });
+            }
+        }, "update-pill").start();
+    }
+
+    private void installUpdateNow() {
+        updatePill.setLabel("Ставлю…");
+        final Context c = getApplicationContext();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    Updater.installPending(c);
+                } catch (Exception e) {
+                    Journal.e("установка по кнопке не удалась", e);
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() { updatePill.setLabel("Ошибка — нужна тихая установка"); }
+                    });
+                }
+            }
+        }, "update-now").start();
+    }
+
     private void showOffline(boolean offline) {
         boolean show = offline && prefs.on(Prefs.NET, true);
         if (show == (netBadge.getVisibility() == View.VISIBLE)) return;
@@ -1132,6 +1201,7 @@ public class MainActivity extends Activity {
         try {
             startActivity(app.intent);
         } catch (ActivityNotFoundException | SecurityException e) {
+            Journal.e("не открылось " + app.key, e);
             reloadApps();
         }
     }

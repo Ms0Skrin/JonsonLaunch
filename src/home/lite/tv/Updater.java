@@ -34,6 +34,9 @@ final class Updater {
 
     interface Listener { void status(String text); }
 
+    /** Вызывается в UI-потоке, когда проверка закончилась (могло появиться скачанное обновление). */
+    static volatile Runnable changed;
+
     private static volatile boolean busy;
 
     private Updater() {}
@@ -89,6 +92,7 @@ final class Updater {
                     new Prefs(c).putTime(Prefs.UPDATE_AT, System.currentTimeMillis());
                     JSONObject rel = new JSONObject(get("https://api.github.com/repos/" + REPO + "/releases/latest"));
                     int code = Integer.parseInt(rel.getString("tag_name").replaceAll("[^0-9]", ""));
+                    Journal.i("проверка обновлений: на GitHub v" + code + ", стоит v" + currentCode(c));
                     if (code <= currentCode(c)) {
                         say("Последняя версия");
                         return;
@@ -108,6 +112,7 @@ final class Updater {
                         throw new IOException("чужая подпись");
                     }
                     part.renameTo(pendingFile(c));
+                    Journal.i("скачано обновление v" + code);
                     if (installNow) {
                         say("Устанавливаю…");
                         installPending(c);
@@ -115,9 +120,12 @@ final class Updater {
                         say("Скачано, поставлю при выключении ТВ");
                     }
                 } catch (Exception e) {
+                    Journal.e("обновление не удалось", e);
                     say("Ошибка: " + reason(e));
                 } finally {
                     busy = false;
+                    Runnable r = changed;
+                    if (r != null) ui.post(r);
                 }
             }
         }, "update").start();
@@ -132,6 +140,7 @@ final class Updater {
         long size = apk.length();
         try (InputStream data = new FileInputStream(apk); SelfAdb adb = new SelfAdb(c, 30_000)) {
             apk.delete();
+            Journal.i("ставлю обновление (" + size + " байт)");
             String out = adb.exec("cmd package install -r -S " + size, data);
             if (!out.contains("Success")) throw new IOException(out.trim());
         }
@@ -152,7 +161,8 @@ final class Updater {
             @Override public void run() {
                 try {
                     if (hasPending(c)) installPending(c);
-                } catch (Exception ignored) {
+                } catch (Exception e) {
+                    Journal.e("установка при выключении ТВ не удалась", e);
                     // Не вышло (например, не разрешена отладка) — файл скачается снова при следующей проверке
                 } finally {
                     busy = false;
@@ -185,7 +195,9 @@ final class Updater {
                 say("Нажмите «Разрешить» на ТВ…");
                 try (SelfAdb adb = new SelfAdb(c, 60_000)) {
                     say("Разрешено ✓");
+                    Journal.i("тихая установка разрешена");
                 } catch (Exception e) {
+                    Journal.e("не удалось разрешить тихую установку", e);
                     say("Ошибка: " + reason(e));
                 }
             }

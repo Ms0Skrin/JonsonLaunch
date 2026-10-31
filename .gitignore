@@ -7,3 +7,4 @@ release/*.apk
 release/*.tar.gz
 # ключ подписи НЕ публикуем: с ним кто угодно мог бы выпустить «обновление»
 debug.keystore
+logs/

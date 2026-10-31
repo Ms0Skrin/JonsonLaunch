@@ -8,7 +8,10 @@ import android.content.Intent;
 public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent i) {
+        Journal.init(c);
+        Journal.i("ТВ включён (BOOT_COMPLETED)");
         Prefs prefs = new Prefs(c);
+        prefs.putTime(Prefs.SLEEP_AT, 0);
         String pkg = Prefs.BOOT_PKGS[prefs.pick(Prefs.BOOT, 0, Prefs.BOOT_PKGS.length)];
         if (pkg == null) return;
         Intent launch = c.getPackageManager().getLeanbackLaunchIntentForPackage(pkg);

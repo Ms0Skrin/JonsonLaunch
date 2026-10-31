@@ -48,6 +48,7 @@ final class Sounds {
                 else if (f.startsWith("back")) back = id;
             }
         } catch (Exception e) {
+            Journal.e("звуки " + pack + " не загрузились", e);
             release();
         }
     }
