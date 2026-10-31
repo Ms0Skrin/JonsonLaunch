@@ -57,6 +57,10 @@ final class SettingsPanel extends FrameLayout {
         scroll.setClipToPadding(false);
         list = new LinearLayout(host);
         list.setOrientation(LinearLayout.VERTICAL);
+        // Строка в фокусе чуть увеличивается — без этого список срезал бы её скругления по бокам
+        list.setClipChildren(false);
+        list.setClipToPadding(false);
+        scroll.setClipChildren(false);
         scroll.addView(list, new LayoutParams(-1, -2));
         LayoutParams slp = new LayoutParams(px(470), -1, Gravity.END);
         slp.setMargins(0, px(20), px(20), px(20));
@@ -102,6 +106,7 @@ final class SettingsPanel extends FrameLayout {
     private void rebuildKeeping(String tag) {
         list.removeAllViews();
         if (appsPage) buildApps(); else build();
+        if (tag.isEmpty()) ((ScrollView) sheet).scrollTo(0, 0);
         View v = list.findViewWithTag(tag);
         if (v != null) v.requestFocus(); else focusFirst();
     }

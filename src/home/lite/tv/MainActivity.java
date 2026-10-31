@@ -429,20 +429,22 @@ public class MainActivity extends Activity {
         // Цитата под доком: крупно, чтобы читалась с дивана; в меню приложений уходит
         quoteBox = new LinearLayout(this);
         quoteBox.setOrientation(LinearLayout.VERTICAL);
-        quoteText = text(22, 0xF2FFFFFF, "sans-serif-light");
+        quoteBox.setGravity(Gravity.CENTER_HORIZONTAL);
+        quoteText = text(24, 0xF2FFFFFF, "sans-serif-light");
+        quoteText.setGravity(Gravity.CENTER);
         quoteText.setShadowLayer(px(10), 0, px(1), 0x99000000);
         quoteText.setLineSpacing(px(3), 1f);
         quoteText.setMaxLines(2);
         quoteText.setEllipsize(TextUtils.TruncateAt.END);
-        quoteAuthor = text(15, 0xB3FFFFFF, "sans-serif");
+        quoteAuthor = text(17, 0xB3FFFFFF, "sans-serif");
         quoteAuthor.setShadowLayer(px(8), 0, px(1), 0x99000000);
         quoteBox.addView(quoteText);
         LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(-2, -2);
         alp.topMargin = px(8);
         quoteBox.addView(quoteAuthor, alp);
         LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(-1, -2);
-        qlp.leftMargin = px(SIDE);
-        qlp.rightMargin = px(SIDE + 120);
+        qlp.leftMargin = px(SIDE + 40);
+        qlp.rightMargin = px(SIDE + 40);
         qlp.bottomMargin = px(22);
         col.addView(quoteBox, qlp);
 
