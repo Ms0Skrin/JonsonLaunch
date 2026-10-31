@@ -138,11 +138,43 @@ final class Updater {
         // Файл удаляем сразу после открытия (читать его можно и дальше): после установки наш процесс
         // перезапустится и сам бы его уже не убрал
         long size = apk.length();
+        if (privileged(c)) {
+            installAsSystem(c, apk, size);
+            return;
+        }
         try (InputStream data = new FileInputStream(apk); SelfAdb adb = new SelfAdb(c, 30_000)) {
             apk.delete();
             Journal.i("ставлю обновление (" + size + " байт)");
             String out = adb.exec("cmd package install -r -S " + size, data);
             if (!out.contains("Success")) throw new IOException(out.trim());
+        }
+    }
+
+    /** Лаунчер стоит в /system/priv-app: ставит обновления сам, без adb. */
+    static boolean privileged(Context c) {
+        return c.checkCallingOrSelfPermission("android.permission.INSTALL_PACKAGES")
+                == android.content.pm.PackageManager.PERMISSION_GRANTED;
+    }
+
+    private static void installAsSystem(Context c, File apk, long size) throws IOException {
+        android.content.pm.PackageInstaller pi = c.getPackageManager().getPackageInstaller();
+        android.content.pm.PackageInstaller.SessionParams sp = new android.content.pm.PackageInstaller.SessionParams(
+                android.content.pm.PackageInstaller.SessionParams.MODE_FULL_INSTALL);
+        sp.setAppPackageName(c.getPackageName());
+        sp.setSize(size);
+        int id = pi.createSession(sp);
+        try (android.content.pm.PackageInstaller.Session s = pi.openSession(id)) {
+            try (InputStream in = new FileInputStream(apk); java.io.OutputStream out = s.openWrite("base.apk", 0, size)) {
+                byte[] buf = new byte[64 * 1024];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                s.fsync(out);
+            }
+            apk.delete();
+            Journal.i("ставлю обновление как системное (" + size + " байт)");
+            android.app.PendingIntent done = android.app.PendingIntent.getBroadcast(c, 0,
+                    new android.content.Intent("home.lite.tv.INSTALLED").setPackage(c.getPackageName()), 0);
+            s.commit(done.getIntentSender());
         }
     }
 
@@ -178,8 +210,9 @@ final class Updater {
         final Handler ui = new Handler(Looper.getMainLooper());
         new Thread(new Runnable() {
             @Override public void run() {
-                final boolean ok = SelfAdb.isAuthorized(c);
-                ui.post(new Runnable() { @Override public void run() { l.status(ok ? "Разрешено ✓" : "›"); } });
+                final boolean sys = privileged(c), ok = sys || SelfAdb.isAuthorized(c);
+                ui.post(new Runnable() { @Override public void run() {
+                    l.status(sys ? "Системное ✓" : ok ? "Разрешено ✓" : "›"); } });
             }
         }, "adb-check").start();
     }
@@ -192,6 +225,7 @@ final class Updater {
             void say(final String s) { ui.post(new Runnable() { @Override public void run() { l.status(s); } }); }
 
             @Override public void run() {
+                if (privileged(c)) { say("Системное ✓"); return; }
                 say("Нажмите «Разрешить» на ТВ…");
                 try (SelfAdb adb = new SelfAdb(c, 60_000)) {
                     say("Разрешено ✓");

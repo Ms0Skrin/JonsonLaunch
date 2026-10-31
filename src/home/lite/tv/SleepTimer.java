@@ -76,6 +76,20 @@ public class SleepTimer extends BroadcastReceiver {
         final PendingResult done = goAsync();
         new Thread(new Runnable() {
             @Override public void run() {
+                // Системный лаунчер с DEVICE_POWER усыпляет ТВ сам, без adb
+                if (c.checkCallingOrSelfPermission("android.permission.DEVICE_POWER")
+                        == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    try {
+                        android.os.PowerManager pm = (android.os.PowerManager) c.getSystemService(Context.POWER_SERVICE);
+                        pm.getClass().getMethod("goToSleep", long.class)
+                                .invoke(pm, android.os.SystemClock.uptimeMillis());
+                        Journal.i("таймер сна: ТВ усыплён (системно)");
+                        done.finish();
+                        return;
+                    } catch (Exception e) {
+                        Journal.e("системное усыпление не вышло, пробую adb", e);
+                    }
+                }
                 try (SelfAdb adb = new SelfAdb(c, 10_000, false)) {
                     adb.exec("input keyevent 223", null); // KEYCODE_SLEEP
                     Journal.i("таймер сна: ТВ усыплён");
