@@ -126,8 +126,8 @@ final class Widgets {
 
     /** Полупрозрачная «пилюля» в верхней строке; в фокусе становится белой, как в tvOS. */
     static final class Pill extends View {
-        static final int MIC = 0, GEAR = 1;
-        private final int icon;
+        static final int MIC = 0, GEAR = 1, WIFI = 2, ETHERNET = 3, OFFLINE = 4;
+        private int icon;
         private final String label;
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint ink = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -147,6 +147,12 @@ final class Widgets {
             stroke.setStyle(Paint.Style.STROKE);
             stroke.setStrokeCap(Paint.Cap.ROUND);
             stroke.setStrokeWidth(1.6f * d);
+        }
+
+        void setIcon(int i) {
+            if (icon == i) return;
+            icon = i;
+            invalidate();
         }
 
         @Override
@@ -175,10 +181,36 @@ final class Widgets {
                 c.drawArc(new RectF(mx - 6.5f * d, my - 5 * d, mx + 6.5f * d, my + 5.5f * d), 20, 140, false, stroke);
                 c.drawLine(mx, my + 5.5f * d, mx, my + 8.5f * d, stroke);
                 c.drawText(label, mx + 13 * d, my - (ink.descent() + ink.ascent()) / 2f, ink);
-            } else {
+            } else if (icon == GEAR) {
                 drawGear(c, getWidth() / 2f, my, 9 * d, ink);
+            } else if (icon == ETHERNET) {
+                drawEthernet(c, getWidth() / 2f, my, d, ink, stroke);
+            } else {
+                drawWifi(c, getWidth() / 2f, my, d, ink, stroke, icon == OFFLINE);
             }
         }
+    }
+
+    /** Wi‑Fi: точка и три дуги веером вверх; без сети — дуги бледнее и перечёркнуты. */
+    static void drawWifi(Canvas c, float cx, float cy, float d, Paint dot, Paint arc, boolean off) {
+        float by = cy + 6 * d;
+        int color = arc.getColor();
+        if (off) arc.setAlpha(Color.alpha(color) * 2 / 5);
+        for (int i = 1; i <= 3; i++) {
+            float r = 4.2f * d * i;
+            c.drawArc(new RectF(cx - r, by - r, cx + r, by + r), 225, 90, false, arc);
+        }
+        c.drawCircle(cx, by - 0.4f * d, 1.6f * d, dot);
+        arc.setColor(color);
+        if (off) c.drawLine(cx - 8 * d, cy - 7 * d, cx + 8 * d, cy + 8 * d, arc);
+    }
+
+    /** Провод: разъём RJ‑45 — корпус с защёлкой и контактами. */
+    static void drawEthernet(Canvas c, float cx, float cy, float d, Paint fill, Paint line) {
+        RectF body = new RectF(cx - 7 * d, cy - 5 * d, cx + 7 * d, cy + 5 * d);
+        c.drawRoundRect(body, 1.8f * d, 1.8f * d, line);
+        c.drawRect(cx - 3 * d, cy + 5 * d, cx + 3 * d, cy + 8 * d, fill);
+        for (int i = -1; i <= 1; i++) c.drawLine(cx + i * 3 * d, cy - 2.5f * d, cx + i * 3 * d, cy + 1 * d, line);
     }
 
     /** Шестерёнка: обод с отверстием и восемь зубцов. */

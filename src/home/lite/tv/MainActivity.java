@@ -31,6 +31,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.TransitionDrawable;
 import android.net.ConnectivityManager;
 import android.net.Network;
+import android.net.NetworkCapabilities;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -108,7 +109,7 @@ public class MainActivity extends Activity {
     private ImageView artView, washBack, washFront;
     private FrameLayout washBox, content;
     private View topBar, gridBg;
-    private Widgets.Pill searchPill;
+    private Widgets.Pill searchPill, netPill;
     private TextView title, clock, date, caption, netBadge;
     private PageScroll page;
     private View topSpacer;
@@ -362,7 +363,15 @@ public class MainActivity extends Activity {
         gear.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { openPanel(); }
         });
-        pills.addView(gear, new LinearLayout.LayoutParams(px(38), px(38)));
+        LinearLayout.LayoutParams glp = new LinearLayout.LayoutParams(px(38), px(38));
+        glp.rightMargin = px(12);
+        pills.addView(gear, glp);
+        // Значок подключения: провод / Wi‑Fi / нет сети; OK — настройки сети
+        netPill = new Widgets.Pill(this, Widgets.Pill.WIFI, null);
+        netPill.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { openNetworkSettings(); }
+        });
+        pills.addView(netPill, new LinearLayout.LayoutParams(px(38), px(38)));
         top.addView(pills, new FrameLayout.LayoutParams(-2, -2, Gravity.START | Gravity.TOP));
 
         LinearLayout clockBox = new LinearLayout(this);
@@ -514,7 +523,8 @@ public class MainActivity extends Activity {
         if (night >= 0) applyNight(true);
         if (netCallback != null && Build.VERSION.SDK_INT >= 24) {
             ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
-            showOffline(cm.getActiveNetwork() == null);
+            Network active = cm.getActiveNetwork();
+            showNetwork(active == null ? null : cm.getNetworkCapabilities(active));
         }
     }
 
@@ -830,16 +840,38 @@ public class MainActivity extends Activity {
             return;
         }
         if (netCallback != null) return;
-        showOffline(cm.getActiveNetwork() == null);
+        Network active = cm.getActiveNetwork();
+        showNetwork(active == null ? null : cm.getNetworkCapabilities(active));
         netCallback = new ConnectivityManager.NetworkCallback() {
-            @Override public void onAvailable(Network n) { postOffline(false); }
-            @Override public void onLost(Network n) { postOffline(true); }
+            @Override public void onCapabilitiesChanged(Network n, final NetworkCapabilities caps) {
+                handler.post(new Runnable() { @Override public void run() { showNetwork(caps); } });
+            }
+            @Override public void onLost(Network n) {
+                handler.post(new Runnable() { @Override public void run() { showNetwork(null); } });
+            }
         };
         cm.registerDefaultNetworkCallback(netCallback);
     }
 
-    private void postOffline(final boolean offline) {
-        handler.post(new Runnable() { @Override public void run() { showOffline(offline); } });
+    /** caps == null — сети нет. */
+    private void showNetwork(NetworkCapabilities caps) {
+        showOffline(caps == null);
+        int icon = caps == null ? Widgets.Pill.OFFLINE
+                : caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ? Widgets.Pill.ETHERNET
+                : Widgets.Pill.WIFI;
+        netPill.setIcon(icon);
+    }
+
+    private void openNetworkSettings() {
+        // На Android TV «Wi‑Fi» открывает общий раздел «Сеть и интернет» — там и проводное подключение
+        String[] actions = {Settings.ACTION_WIFI_SETTINGS, Settings.ACTION_WIRELESS_SETTINGS, Settings.ACTION_SETTINGS};
+        for (String a : actions) {
+            try {
+                startActivity(new Intent(a).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                return;
+            } catch (ActivityNotFoundException ignored) {
+            }
+        }
     }
 
     private void showOffline(boolean offline) {
