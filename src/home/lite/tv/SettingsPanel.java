@@ -92,20 +92,44 @@ final class SettingsPanel extends FrameLayout {
         }
     }
 
-    /** Открыт ли список приложений (подменю) вместо основных настроек. */
-    private boolean appsPage;
+    /** Какая страница открыта: основные настройки или подменю. */
+    private static final int MAIN = 0, WALLPAPER = 1, APPS = 2;
+    private int page = MAIN;
 
     /** «Назад» внутри подменю возвращает к настройкам; true — нажатие обработано. */
     boolean back() {
-        if (!appsPage) return false;
-        appsPage = false;
-        rebuildKeeping("apps");
+        if (page == MAIN) return false;
+        String tag = page == APPS ? "apps" : "wallpaper";
+        page = MAIN;
+        rebuildKeeping(tag);
         return true;
+    }
+
+    private void openPage(int p) {
+        page = p;
+        rebuildKeeping("");
+    }
+
+    /** Строка-вход в подменю. */
+    private void submenu(String title, String tag, String value, final int p) {
+        Row r = row(title);
+        r.setTag(tag);
+        r.value(value + "  ›");
+        r.click = new Runnable() { @Override public void run() { openPage(p); } };
+    }
+
+    private void pageHead(String title) {
+        TextView head = label(title, 28, Color.WHITE, "sans-serif-medium");
+        head.setPadding(px(14), 0, 0, px(6));
+        list.addView(head);
+        TextView hint = label("«Назад» — к настройкам", 13, 0x80FFFFFF, "sans-serif");
+        hint.setPadding(px(14), 0, 0, px(12));
+        list.addView(hint);
     }
 
     private void rebuildKeeping(String tag) {
         list.removeAllViews();
-        if (appsPage) buildApps(); else build();
+        if (page == APPS) buildApps(); else if (page == WALLPAPER) buildWallpaper(); else build();
         if (tag.isEmpty()) ((ScrollView) sheet).scrollTo(0, 0);
         View v = list.findViewWithTag(tag);
         if (v != null) v.requestFocus(); else focusFirst();
@@ -119,24 +143,7 @@ final class SettingsPanel extends FrameLayout {
         list.addView(head);
 
         section("Оформление");
-        choice("Фон", Prefs.BG, Prefs.BG_NAMES, Prefs.BG_PIC);
-        picRow();
-        choice("Менять картинку", Prefs.ROTATE, Prefs.ROTATE_NAMES, Prefs.ROTATE_DEF);
-        // На картинках — следующая картинка, на абстрактных фонах — новый узор
-        action("Сменить фон", "›", new Runnable() {
-            @Override public void run() {
-                if (prefs.bg() >= Prefs.BG_PIC) {
-                    stepPicture(1);
-                    return;
-                } else {
-                    prefs.put(Prefs.SEED, prefs.get(Prefs.SEED, 0) + 1);
-                }
-                host.applyPrefs();
-            }
-        });
-        toggle("Живой фон", Prefs.LIVE, true);
-        choice("Ночной режим", Prefs.NIGHT, Prefs.NIGHT_NAMES, Prefs.NIGHT_DEF);
-        toggle("Подсветка от приложения", Prefs.TINT, false);
+        submenu("Обои", "wallpaper", Prefs.BG_NAMES[prefs.bg()], WALLPAPER);
         choice("Прозрачность плиток", Prefs.OPACITY, Prefs.OPACITY_NAMES, 0);
         choice("Прозрачность активной", Prefs.FOCUS_OPACITY, Prefs.OPACITY_NAMES, 0);
         choice("Размер плиток", Prefs.SIZE, Prefs.SIZE_NAMES, 1);
@@ -156,15 +163,7 @@ final class SettingsPanel extends FrameLayout {
         choice("Открывать", Prefs.BOOT, Prefs.BOOT_NAMES, 0);
 
         section("Приложения");
-        Row apps = row("Док, меню и скрытые");
-        apps.setTag("apps");
-        apps.value(host.allApps().size() + "  ›");
-        apps.click = new Runnable() {
-            @Override public void run() {
-                appsPage = true;
-                rebuildKeeping("");
-            }
-        };
+        submenu("Док, меню и скрытые", "apps", String.valueOf(host.allApps().size()), APPS);
 
         section("Обновления");
         toggle("Автоустановка обновлений", Prefs.AUTO_UPDATE, true);
@@ -210,13 +209,34 @@ final class SettingsPanel extends FrameLayout {
     }
 
     private void buildApps() {
-        TextView head = label("Приложения", 28, Color.WHITE, "sans-serif-medium");
-        head.setPadding(px(14), 0, 0, px(6));
-        list.addView(head);
-        TextView hint = label("OK — док / меню / скрыть,  ◀ ▶ — порядок.  «Назад» — к настройкам", 13, 0x80FFFFFF, "sans-serif");
-        hint.setPadding(px(14), 0, 0, px(12));
+        pageHead("Приложения");
+        TextView hint = label("OK — док / меню / скрыть,  ◀ ▶ — порядок", 13, 0x80FFFFFF, "sans-serif");
+        hint.setPadding(px(14), 0, 0, px(8));
         list.addView(hint);
         appRows();
+    }
+
+    /** Всё про фон: набор, картинка, смена, живой фон, ночной режим, подсветка. */
+    private void buildWallpaper() {
+        pageHead("Обои");
+        choice("Фон", Prefs.BG, Prefs.BG_NAMES, Prefs.BG_PIC);
+        picRow();
+        choice("Менять картинку", Prefs.ROTATE, Prefs.ROTATE_NAMES, Prefs.ROTATE_DEF);
+        // На картинках — следующая картинка, на абстрактных фонах — новый узор
+        action("Сменить фон", "›", new Runnable() {
+            @Override public void run() {
+                if (prefs.bg() >= Prefs.BG_PIC) {
+                    stepPicture(1);
+                    return;
+                } else {
+                    prefs.put(Prefs.SEED, prefs.get(Prefs.SEED, 0) + 1);
+                }
+                host.applyPrefs();
+            }
+        });
+        toggle("Живой фон", Prefs.LIVE, true);
+        choice("Ночной режим", Prefs.NIGHT, Prefs.NIGHT_NAMES, Prefs.NIGHT_DEF);
+        toggle("Подсветка от приложения", Prefs.TINT, false);
     }
 
     private void appRows() {
