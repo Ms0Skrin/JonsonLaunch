@@ -72,6 +72,19 @@ final class SettingsPanel extends FrameLayout {
 
     private int px(float v) { return Math.round(v * dp); }
 
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent ev) {
+        if (Widgets.wrapFocus(list, ev)) {
+            // Перепрыгнули по кругу — показываем список с самого начала / до самого конца, вместе с заголовками
+            final boolean top = ev.getKeyCode() == KeyEvent.KEYCODE_DPAD_DOWN;
+            sheet.post(new Runnable() {
+                @Override public void run() { ((ScrollView) sheet).smoothScrollTo(0, top ? 0 : list.getHeight()); }
+            });
+            return true;
+        }
+        return super.dispatchKeyEvent(ev);
+    }
+
     void show() {
         sheet.setTranslationX(px(510));
         dim.setAlpha(0f);

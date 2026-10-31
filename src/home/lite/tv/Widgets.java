@@ -269,4 +269,21 @@ final class Widgets {
             c.restore();
         }
     }
+
+    /** Меню по кругу: ▼ на последнем пункте — к первому, ▲ на первом — к последнему. */
+    static boolean wrapFocus(android.view.ViewGroup root, android.view.KeyEvent ev) {
+        if (ev.getAction() != android.view.KeyEvent.ACTION_DOWN) return false;
+        int code = ev.getKeyCode(), dir;
+        if (code == android.view.KeyEvent.KEYCODE_DPAD_DOWN) dir = android.view.View.FOCUS_DOWN;
+        else if (code == android.view.KeyEvent.KEYCODE_DPAD_UP) dir = android.view.View.FOCUS_UP;
+        else return false;
+        android.view.View cur = root.findFocus();
+        if (cur == null || android.view.FocusFinder.getInstance().findNextFocus(root, cur, dir) != null) return false;
+        java.util.ArrayList<android.view.View> all = root.getFocusables(dir);
+        if (all.size() < 2) return false;
+        android.view.View to = dir == android.view.View.FOCUS_DOWN ? all.get(0) : all.get(all.size() - 1);
+        if (to == cur) return false;
+        to.requestFocus();
+        return true;
+    }
 }

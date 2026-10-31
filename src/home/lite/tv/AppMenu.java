@@ -76,6 +76,12 @@ final class AppMenu extends FrameLayout {
 
     private int px(float v) { return Math.round(v * dp); }
 
+    @Override
+    public boolean dispatchKeyEvent(android.view.KeyEvent ev) {
+        if (Widgets.wrapFocus(card, ev)) return true;
+        return super.dispatchKeyEvent(ev);
+    }
+
     void add(String name, final Runnable run) {
         final TextView t = label(name, 16, Color.WHITE, "sans-serif");
         t.setGravity(Gravity.CENTER_VERTICAL);

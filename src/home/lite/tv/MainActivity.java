@@ -78,7 +78,7 @@ public class MainActivity extends Activity {
     static final String SETTINGS_KEY = "#settings";
     /** Порядок по умолчанию; эти же приложения по умолчанию в доке. */
     private static final List<String> DEFAULT_DOCK = Arrays.asList(
-            "com.google.android.youtube.tv", "com.android.tv", "com.mediatek.wwtv.tvcenter",
+            "com.google.android.youtube.tv", "org.smarttube.stable", "com.android.tv", "com.mediatek.wwtv.tvcenter",
             "tv.twitch.android.app", "com.android.vending", SETTINGS_KEY);
     /** com.android.tv.settings открывает то же, что своя плитка «Настройки», — второй раз не показываем. */
     private static final List<String> NEVER_SHOW = Arrays.asList("com.mitv.dream", "com.xiaomi.mitv.tvmanager",
