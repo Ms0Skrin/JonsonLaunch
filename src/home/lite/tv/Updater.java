@@ -162,6 +162,18 @@ final class Updater {
         }, "update-install").start();
     }
 
+    /** Тихо проверить, разрешена ли установка, и показать статус. */
+    static void checkPermission(final Context ctx, final Listener l) {
+        final Context c = ctx.getApplicationContext();
+        final Handler ui = new Handler(Looper.getMainLooper());
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final boolean ok = SelfAdb.isAuthorized(c);
+                ui.post(new Runnable() { @Override public void run() { l.status(ok ? "Разрешено ✓" : "›"); } });
+            }
+        }, "adb-check").start();
+    }
+
     /** Подключиться к своему adb: в первый раз ТВ покажет «Разрешить отладку». */
     static void requestPermission(final Context ctx, final Listener l) {
         final Context c = ctx.getApplicationContext();

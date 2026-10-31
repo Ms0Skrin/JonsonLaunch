@@ -163,6 +163,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle state) {
         super.onCreate(state);
         prefs = new Prefs(this);
+        sounds = new Sounds(this);
         dp = getResources().getDisplayMetrics().density;
         setContentView(buildUi());
         // Чёрное окно под полноэкранным фоном — лишняя заливка каждого кадра; слабому GPU это заметно
@@ -185,6 +186,7 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         unregisterReceiver(packageReceiver);
         unregisterReceiver(screenReceiver);
+        sounds.release();
         super.onDestroy();
     }
 
@@ -293,6 +295,30 @@ public class MainActivity extends Activity {
         if (appMenu != null) closeAppMenu();
         else if (panel != null && !panel.back()) closePanel();
         else if (gridMode) restoreFocus();
+    }
+
+    private Sounds sounds;
+
+    /** Звук нажатия — после обработки, чтобы смена набора в настройках сразу звучала новым. */
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent ev) {
+        boolean r = super.dispatchKeyEvent(ev);
+        if (ev.getAction() == KeyEvent.ACTION_DOWN && sounds != null) {
+            float vol = Prefs.SFX_VOLS[prefs.pick(Prefs.SFX_VOL, Prefs.SFX_VOL_DEF, Prefs.SFX_VOLS.length)];
+            switch (ev.getKeyCode()) {
+                case KeyEvent.KEYCODE_DPAD_UP: case KeyEvent.KEYCODE_DPAD_DOWN:
+                case KeyEvent.KEYCODE_DPAD_LEFT: case KeyEvent.KEYCODE_DPAD_RIGHT:
+                    sounds.play(Sounds.MOVE, vol); break;
+                case KeyEvent.KEYCODE_DPAD_CENTER: case KeyEvent.KEYCODE_ENTER:
+                case KeyEvent.KEYCODE_NUMPAD_ENTER:
+                    if (ev.getRepeatCount() == 0) sounds.play(Sounds.SELECT, vol);
+                    break;
+                case KeyEvent.KEYCODE_BACK: case KeyEvent.KEYCODE_MENU:
+                    if (ev.getRepeatCount() == 0) sounds.play(Sounds.BACK, vol);
+                    break;
+            }
+        }
+        return r;
     }
 
     @Override
@@ -518,6 +544,7 @@ public class MainActivity extends Activity {
 
     /** Применить все настройки: фон, видимость элементов, плитки. */
     void applyPrefs() {
+        sounds.use(Prefs.SFX_PACKS[prefs.pick(Prefs.SFX, 0, Prefs.SFX_PACKS.length)]);
         applyBackground(true);
         boolean appBg = appBackground();
         boolean tint = prefs.on(Prefs.TINT, false);

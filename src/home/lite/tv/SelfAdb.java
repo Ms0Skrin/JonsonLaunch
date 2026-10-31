@@ -53,7 +53,10 @@ final class SelfAdb implements AutoCloseable {
     }
 
     /** Подключиться и пройти авторизацию; ждёт до waitMs, пока на ТВ нажмут «Разрешить». */
-    SelfAdb(Context c, int waitMs) throws IOException {
+    SelfAdb(Context c, int waitMs) throws IOException { this(c, waitMs, true); }
+
+    /** offerKey=false: только проверить, разрешён ли уже ключ, не вызывая окно на ТВ. */
+    SelfAdb(Context c, int waitMs, boolean offerKey) throws IOException {
         KeyPair keys = loadKeys(c);
         socket = new Socket();
         socket.connect(new InetSocketAddress("127.0.0.1", 5555), 3000);
@@ -72,10 +75,22 @@ final class SelfAdb implements AutoCloseable {
             if (!signed) {
                 signed = true;
                 send(A_AUTH, AUTH_SIGNATURE, 0, sign(keys.getPrivate(), m.data));
+            } else if (!offerKey) {
+                close();
+                throw new IOException("adb: ключ не разрешён");
             } else {
                 // Ключ ещё не разрешён — ТВ покажет окно «Разрешить отладку»
                 send(A_AUTH, AUTH_RSAPUBLICKEY, 0, publicKeyBlob((RSAPublicKey) keys.getPublic()));
             }
+        }
+    }
+
+    /** Разрешён ли уже ключ лаунчера (без окна на ТВ). Вызывать не из UI-потока. */
+    static boolean isAuthorized(Context c) {
+        try (SelfAdb adb = new SelfAdb(c, 3000, false)) {
+            return true;
+        } catch (Exception e) {
+            return false;
         }
     }
 

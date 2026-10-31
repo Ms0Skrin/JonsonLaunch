@@ -159,6 +159,10 @@ final class SettingsPanel extends FrameLayout {
         toggle("Значок «нет сети»", Prefs.NET, true);
         toggle("Плавное появление", Prefs.INTRO, true);
 
+        section("Звук");
+        choice("Звуки нажатий", Prefs.SFX, Prefs.SFX_NAMES, 0);
+        choice("Громкость звуков", Prefs.SFX_VOL, Prefs.SFX_VOL_NAMES, Prefs.SFX_VOL_DEF);
+
         section("При включении ТВ");
         choice("Открывать", Prefs.BOOT, Prefs.BOOT_NAMES, 0);
 
@@ -179,6 +183,9 @@ final class SettingsPanel extends FrameLayout {
         };
         final Row allow = row("Разрешить тихую установку");
         allow.value("›");
+        Updater.checkPermission(host, new Updater.Listener() {
+            @Override public void status(String text) { allow.value(text); }
+        });
         allow.click = new Runnable() {
             @Override public void run() {
                 Updater.requestPermission(host, new Updater.Listener() {

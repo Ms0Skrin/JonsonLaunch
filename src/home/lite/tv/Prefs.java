@@ -17,7 +17,8 @@ final class Prefs {
             ORDER = "order", HIDDEN = "hidden", DOCK = "dock", PIC = "pic", ROTATE = "rotate", PIC_AT = "pic_at",
             NIGHT = "night", NET = "net", INTRO = "intro", OPACITY = "opacity",
             FOCUS_OPACITY = "focus_opacity", AUTO_UPDATE = "auto_update", UPDATE_AT = "update_at",
-            QUOTES = "quotes_every", QUOTE = "quote", QUOTE_AT = "quote_at";
+            QUOTES = "quotes_every", QUOTE = "quote", QUOTE_AT = "quote_at",
+            SFX = "sfx", SFX_VOL = "sfx_vol";
 
     static final String[] BG_NAMES = {"Аврора", "Закат", "Океан", "Лес", "Графит", "От приложения",
             "Абстракция", "Пейзажи", "Автомобили", "Животные", "Города", "Люди"};
@@ -38,6 +39,12 @@ final class Prefs {
     static final String[] QUOTE_NAMES = {"Выкл", "При каждом заходе", "Каждый час", "Раз в день"};
     static final long[] QUOTE_MS = {-1, 0, 60 * 60_000L, 24 * 60 * 60_000L};
     static final int QUOTE_DEF = 3;
+    /** Звуки нажатий: набор из assets/sfx (индекс 0 — выключены) и громкость. */
+    static final String[] SFX_NAMES = {"Выкл", "Мягкие", "Пузырьки", "Ксилофон", "Ретро", "Капли", "Щелчки"};
+    static final String[] SFX_PACKS = {null, "soft", "bubbles", "xylo", "retro", "drops", "clicks"};
+    static final String[] SFX_VOL_NAMES = {"Тихо", "Средне", "Громко"};
+    static final float[] SFX_VOLS = {0.25f, 0.5f, 1f};
+    static final int SFX_VOL_DEF = 1;
     static final String[] SIZE_NAMES = {"Маленькие", "Средние", "Крупные"};
     static final int[][] SIZES = {{164, 92}, {186, 105}, {216, 122}};
     static final String[] ROUND_NAMES = {"Мягкое", "Среднее", "Сильное"};
