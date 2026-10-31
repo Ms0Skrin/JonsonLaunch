@@ -6,6 +6,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -34,7 +35,6 @@ final class Updater {
     interface Listener { void status(String text); }
 
     private static volatile boolean busy;
-    private static File pending;
 
     private Updater() {}
 
@@ -54,12 +54,24 @@ final class Updater {
         }
     }
 
-    /** Скачанное и проверенное обновление ждёт установки (ставим, когда лаунчер не на экране). */
-    static synchronized boolean hasPending() { return pending != null && pending.exists(); }
+    /** Скачанное обновление лежит в кэше до выключения ТВ — переживает и перезапуск лаунчера. */
+    private static File pendingFile(Context c) { return new File(c.getCacheDir(), "update.apk"); }
+
+    /** Есть скачанная версия новее установленной и с нашей подписью. */
+    static boolean hasPending(Context c) {
+        File apk = pendingFile(c);
+        if (!apk.exists()) return false;
+        PackageInfo p = c.getPackageManager().getPackageArchiveInfo(apk.getPath(), 0);
+        if (p == null || p.versionCode <= currentCode(c) || !sameSigner(c, apk)) {
+            apk.delete();
+            return false;
+        }
+        return true;
+    }
 
     /**
      * Проверить и скачать. installNow — ставить сразу (кнопка в настройках),
-     * иначе обновление ждёт момента, когда лаунчер уйдёт с экрана.
+     * иначе обновление ждёт, пока ТВ выключат пультом.
      */
     static void check(final Context ctx, final boolean installNow, final Listener l) {
         if (busy) return;
@@ -89,18 +101,18 @@ final class Updater {
                     }
                     if (url == null) throw new IOException("в релизе нет APK");
                     say("Скачиваю " + rel.getString("tag_name") + "…");
-                    File apk = new File(c.getCacheDir(), "update.apk");
-                    download(url, apk);
-                    if (!sameSigner(c, apk)) {
-                        apk.delete();
+                    File part = new File(c.getCacheDir(), "update.part");
+                    download(url, part);
+                    if (!sameSigner(c, part)) {
+                        part.delete();
                         throw new IOException("чужая подпись");
                     }
-                    synchronized (Updater.class) { pending = apk; }
+                    part.renameTo(pendingFile(c));
                     if (installNow) {
                         say("Устанавливаю…");
                         installPending(c);
                     } else {
-                        say("Скачано, поставлю в фоне");
+                        say("Скачано, поставлю при выключении ТВ");
                     }
                 } catch (Exception e) {
                     say("Ошибка: " + reason(e));
@@ -113,30 +125,38 @@ final class Updater {
 
     /** Поставить скачанное обновление. Процесс лаунчера при этом перезапустится. */
     static void installPending(Context c) throws IOException {
-        File apk;
-        synchronized (Updater.class) { apk = pending; }
-        if (apk == null || !apk.exists()) return;
-        try (SelfAdb adb = new SelfAdb(c, 30_000); InputStream data = new FileInputStream(apk)) {
-            String out = adb.exec("cmd package install -r -S " + apk.length(), data);
+        File apk = pendingFile(c);
+        if (!apk.exists()) return;
+        // Файл удаляем сразу после открытия (читать его можно и дальше): после установки наш процесс
+        // перезапустится и сам бы его уже не убрал
+        long size = apk.length();
+        try (InputStream data = new FileInputStream(apk); SelfAdb adb = new SelfAdb(c, 30_000)) {
+            apk.delete();
+            String out = adb.exec("cmd package install -r -S " + size, data);
             if (!out.contains("Success")) throw new IOException(out.trim());
         }
-        synchronized (Updater.class) { pending = null; }
-        apk.delete();
     }
 
-    /** То же в фоне — когда лаунчер ушёл с экрана. */
-    static void installPendingQuietly(final Context ctx) {
-        if (!hasPending() || busy) return;
-        busy = true;
+    /**
+     * ТВ выключили пультом: тихо ставим скачанное обновление, пока никто не смотрит.
+     * Держим процессор бодрствующим на время установки, иначе приставка уснёт посреди неё.
+     */
+    static void installOnScreenOff(final Context ctx) {
         final Context c = ctx.getApplicationContext();
+        if (busy) return;
+        busy = true;
+        final PowerManager.WakeLock lock = ((PowerManager) c.getSystemService(Context.POWER_SERVICE))
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "JonsonLaunch:update");
+        lock.acquire(3 * 60_000L);
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
-                    installPending(c);
+                    if (hasPending(c)) installPending(c);
                 } catch (Exception ignored) {
-                    // Не вышло (например, не разрешена отладка) — попробуем при следующем уходе с экрана
+                    // Не вышло (например, не разрешена отладка) — файл скачается снова при следующей проверке
                 } finally {
                     busy = false;
+                    if (lock.isHeld()) lock.release();
                 }
             }
         }, "update-install").start();

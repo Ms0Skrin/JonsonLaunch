@@ -16,7 +16,8 @@ final class Prefs {
             TITLE = "title", CLOCK = "clock", DATE = "date", SEARCH = "search", SPEED = "speed", BOOT = "boot",
             ORDER = "order", HIDDEN = "hidden", DOCK = "dock", PIC = "pic", ROTATE = "rotate", PIC_AT = "pic_at",
             NIGHT = "night", NET = "net", INTRO = "intro", OPACITY = "opacity",
-            FOCUS_OPACITY = "focus_opacity", AUTO_UPDATE = "auto_update", UPDATE_AT = "update_at";
+            FOCUS_OPACITY = "focus_opacity", AUTO_UPDATE = "auto_update", UPDATE_AT = "update_at",
+            QUOTES = "quotes_every", QUOTE = "quote", QUOTE_AT = "quote_at";
 
     static final String[] BG_NAMES = {"Аврора", "Закат", "Океан", "Лес", "Графит", "От приложения",
             "Абстракция", "Пейзажи", "Автомобили", "Животные", "Города", "Люди"};
@@ -33,6 +34,10 @@ final class Prefs {
     static final int ROTATE_DEF = 4;
     static final String[] OPACITY_NAMES = {"100%", "90%", "80%", "70%", "60%", "50%", "40%", "30%"};
     static final float[] OPACITIES = {1f, 0.9f, 0.8f, 0.7f, 0.6f, 0.5f, 0.4f, 0.3f};
+    /** Цитата под доком: выключена / новая при каждом возврате / раз в час / раз в день. */
+    static final String[] QUOTE_NAMES = {"Выкл", "При каждом заходе", "Каждый час", "Раз в день"};
+    static final long[] QUOTE_MS = {-1, 0, 60 * 60_000L, 24 * 60 * 60_000L};
+    static final int QUOTE_DEF = 3;
     static final String[] SIZE_NAMES = {"Маленькие", "Средние", "Крупные"};
     static final int[][] SIZES = {{164, 92}, {186, 105}, {216, 122}};
     static final String[] ROUND_NAMES = {"Мягкое", "Среднее", "Сильное"};

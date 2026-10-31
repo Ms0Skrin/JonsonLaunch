@@ -1,6 +1,7 @@
 package home.lite.tv;
 
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.util.TypedValue;
@@ -40,17 +41,24 @@ final class SettingsPanel extends FrameLayout {
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(0xF01C1C1E);
         bg.setCornerRadius(px(28));
-        ScrollView scroll = new ScrollView(host);
+        // Прокручивая к выделенной строке, оставляем запас: скругления плашки не упираются в край панели
+        ScrollView scroll = new ScrollView(host) {
+            @Override
+            protected int computeScrollDeltaToGetChildRectOnScreen(Rect r) {
+                int m = px(28);
+                return super.computeScrollDeltaToGetChildRectOnScreen(new Rect(r.left, r.top - m, r.right, r.bottom + m));
+            }
+        };
         scroll.setBackground(bg);
         scroll.setClipToOutline(true);
         scroll.setElevation(px(24));
         scroll.setVerticalScrollBarEnabled(false);
-        scroll.setPadding(px(18), px(26), px(18), px(26));
+        scroll.setPadding(px(24), px(26), px(24), px(26));
         scroll.setClipToPadding(false);
         list = new LinearLayout(host);
         list.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(list, new LayoutParams(-1, -2));
-        LayoutParams slp = new LayoutParams(px(420), -1, Gravity.END);
+        LayoutParams slp = new LayoutParams(px(470), -1, Gravity.END);
         slp.setMargins(0, px(20), px(20), px(20));
         addView(scroll, slp);
         sheet = scroll;
@@ -61,7 +69,7 @@ final class SettingsPanel extends FrameLayout {
     private int px(float v) { return Math.round(v * dp); }
 
     void show() {
-        sheet.setTranslationX(px(460));
+        sheet.setTranslationX(px(510));
         dim.setAlpha(0f);
         sheet.animate().translationX(0).setDuration(240).start();
         dim.animate().alpha(1f).setDuration(240).start();
@@ -70,7 +78,7 @@ final class SettingsPanel extends FrameLayout {
 
     void hide(Runnable end) {
         dim.animate().alpha(0f).setDuration(180).start();
-        sheet.animate().translationX(px(460)).setDuration(180).withEndAction(end).start();
+        sheet.animate().translationX(px(510)).setDuration(180).withEndAction(end).start();
     }
 
     private void focusFirst() {
@@ -80,9 +88,20 @@ final class SettingsPanel extends FrameLayout {
         }
     }
 
+    /** Открыт ли список приложений (подменю) вместо основных настроек. */
+    private boolean appsPage;
+
+    /** «Назад» внутри подменю возвращает к настройкам; true — нажатие обработано. */
+    boolean back() {
+        if (!appsPage) return false;
+        appsPage = false;
+        rebuildKeeping("apps");
+        return true;
+    }
+
     private void rebuildKeeping(String tag) {
         list.removeAllViews();
-        build();
+        if (appsPage) buildApps(); else build();
         View v = list.findViewWithTag(tag);
         if (v != null) v.requestFocus(); else focusFirst();
     }
@@ -124,6 +143,7 @@ final class SettingsPanel extends FrameLayout {
         toggle("Часы", Prefs.CLOCK, true);
         toggle("Дата", Prefs.DATE, true);
         toggle("Кнопка поиска", Prefs.SEARCH, true);
+        choice("Цитаты", Prefs.QUOTES, Prefs.QUOTE_NAMES, Prefs.QUOTE_DEF);
         toggle("Значок «нет сети»", Prefs.NET, true);
         toggle("Плавное появление", Prefs.INTRO, true);
 
@@ -131,10 +151,15 @@ final class SettingsPanel extends FrameLayout {
         choice("Открывать", Prefs.BOOT, Prefs.BOOT_NAMES, 0);
 
         section("Приложения");
-        TextView hint = label("OK — док / меню / скрыть,  ◀ ▶ — порядок.  Долгое OK на плитке — меню", 13, 0x80FFFFFF, "sans-serif");
-        hint.setPadding(px(14), 0, 0, px(8));
-        list.addView(hint);
-        appRows();
+        Row apps = row("Док, меню и скрытые");
+        apps.setTag("apps");
+        apps.value(host.allApps().size() + "  ›");
+        apps.click = new Runnable() {
+            @Override public void run() {
+                appsPage = true;
+                rebuildKeeping("");
+            }
+        };
 
         section("Обновления");
         toggle("Автоустановка обновлений", Prefs.AUTO_UPDATE, true);
@@ -177,6 +202,16 @@ final class SettingsPanel extends FrameLayout {
                 rebuildKeeping("reset");
             }
         };
+    }
+
+    private void buildApps() {
+        TextView head = label("Приложения", 28, Color.WHITE, "sans-serif-medium");
+        head.setPadding(px(14), 0, 0, px(6));
+        list.addView(head);
+        TextView hint = label("OK — док / меню / скрыть,  ◀ ▶ — порядок.  «Назад» — к настройкам", 13, 0x80FFFFFF, "sans-serif");
+        hint.setPadding(px(14), 0, 0, px(12));
+        list.addView(hint);
+        appRows();
     }
 
     private void appRows() {

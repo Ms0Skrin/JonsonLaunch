@@ -110,7 +110,9 @@ public class MainActivity extends Activity {
     private FrameLayout washBox, content;
     private View topBar, gridBg;
     private Widgets.Pill searchPill, netPill;
-    private TextView title, clock, date, caption, netBadge;
+    private TextView title, clock, date, caption, netBadge, quoteText, quoteAuthor;
+    private LinearLayout quoteBox;
+    private String[] quote;
     private PageScroll page;
     private View topSpacer;
     private HorizontalScrollView dockScroller;
@@ -143,6 +145,8 @@ public class MainActivity extends Activity {
                 introPending = true;
                 // Прячем заранее: подсветка ТВ загорается с задержкой, и появление должно быть видно целиком
                 if (prefs.on(Prefs.INTRO, true)) hideForIntro();
+                // ТВ выключили — самое время тихо поставить скачанное обновление
+                if (prefs.on(Prefs.AUTO_UPDATE, true)) Updater.installOnScreenOff(MainActivity.this);
             } else if (resumed) {
                 maybeIntro();
             }
@@ -215,6 +219,7 @@ public class MainActivity extends Activity {
         // Фон отпускается в onStop; декодируем сразу, чтобы не мелькнул чёрный экран
         if (artKey == null) applyBackground(false);
         watchNetwork(true);
+        nextQuote();
     }
 
     @Override
@@ -228,8 +233,6 @@ public class MainActivity extends Activity {
         washBack.setImageDrawable(null);
         washFront.setImageDrawable(null);
         watchNetwork(false);
-        // Обновление ставим, пока смотрят что-то другое: перезапуск лаунчера никто не заметит
-        if (prefs.on(Prefs.AUTO_UPDATE, true)) Updater.installPendingQuietly(this);
         super.onStop();
     }
 
@@ -288,7 +291,7 @@ public class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (appMenu != null) closeAppMenu();
-        else if (panel != null) closePanel();
+        else if (panel != null && !panel.back()) closePanel();
         else if (gridMode) restoreFocus();
     }
 
@@ -423,6 +426,26 @@ public class MainActivity extends Activity {
         dockScroller.addView(dockRow, new FrameLayout.LayoutParams(-2, -2));
         col.addView(dockScroller, new LinearLayout.LayoutParams(-1, -2));
 
+        // Цитата под доком: крупно, чтобы читалась с дивана; в меню приложений уходит
+        quoteBox = new LinearLayout(this);
+        quoteBox.setOrientation(LinearLayout.VERTICAL);
+        quoteText = text(22, 0xF2FFFFFF, "sans-serif-light");
+        quoteText.setShadowLayer(px(10), 0, px(1), 0x99000000);
+        quoteText.setLineSpacing(px(3), 1f);
+        quoteText.setMaxLines(2);
+        quoteText.setEllipsize(TextUtils.TruncateAt.END);
+        quoteAuthor = text(15, 0xB3FFFFFF, "sans-serif");
+        quoteAuthor.setShadowLayer(px(8), 0, px(1), 0x99000000);
+        quoteBox.addView(quoteText);
+        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(-2, -2);
+        alp.topMargin = px(8);
+        quoteBox.addView(quoteAuthor, alp);
+        LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(-1, -2);
+        qlp.leftMargin = px(SIDE);
+        qlp.rightMargin = px(SIDE + 120);
+        qlp.bottomMargin = px(22);
+        col.addView(quoteBox, qlp);
+
         // Разделитель и подпись к меню
         View line = new View(this);
         line.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
@@ -509,6 +532,9 @@ public class MainActivity extends Activity {
         clock.setVisibility(prefs.on(Prefs.CLOCK, true) ? View.VISIBLE : View.GONE);
         date.setVisibility(prefs.on(Prefs.DATE, true) ? View.VISIBLE : View.GONE);
         searchPill.setVisibility(prefs.on(Prefs.SEARCH, true) ? View.VISIBLE : View.GONE);
+        boolean quotes = Prefs.QUOTE_MS[prefs.pick(Prefs.QUOTES, Prefs.QUOTE_DEF, Prefs.QUOTE_MS.length)] >= 0;
+        quoteBox.setVisibility(quotes ? View.VISIBLE : View.GONE);
+        if (quotes && quote == null) nextQuote();
 
         // Док по высоте — чуть выше середины экрана
         int[] size = dockSize();
@@ -728,6 +754,7 @@ public class MainActivity extends Activity {
         gridBg.animate().alpha(on ? 1f : 0f).setDuration(d).start();
         dockScroller.animate().alpha(on ? 0.35f : 1f).setDuration(d).start();
         title.animate().alpha(on ? 0f : 1f).setDuration(d).start();
+        quoteBox.animate().alpha(on ? 0f : 1f).translationY(on ? -px(14) : 0).setDuration(d).start();
         topBar.animate().alpha(on ? 0f : 1f).setDuration(d).start();
         caption.animate().alpha(on ? 1f : 0.6f).setDuration(d).start();
     }
@@ -851,6 +878,23 @@ public class MainActivity extends Activity {
             }
         };
         cm.registerDefaultNetworkCallback(netCallback);
+    }
+
+    /** Цитата меняется с выбранной частотой; номер и время смены хранятся, чтобы «раз в день» переживал перезапуск. */
+    private void nextQuote() {
+        long every = Prefs.QUOTE_MS[prefs.pick(Prefs.QUOTES, Prefs.QUOTE_DEF, Prefs.QUOTE_MS.length)];
+        if (every < 0) return;
+        int i = prefs.pick(Prefs.QUOTE, -1, Quotes.ALL.length);
+        long now = System.currentTimeMillis();
+        if (i < 0 || now - prefs.time(Prefs.QUOTE_AT) >= every) {
+            quote = Quotes.random(rnd, i < 0 ? null : Quotes.ALL[i]);
+            prefs.put(Prefs.QUOTE, Arrays.asList(Quotes.ALL).indexOf(quote));
+            prefs.putTime(Prefs.QUOTE_AT, now);
+        } else {
+            quote = Quotes.ALL[i];
+        }
+        quoteText.setText("«" + quote[0] + "»");
+        quoteAuthor.setText("— " + quote[1]);
     }
 
     /** caps == null — сети нет. */
