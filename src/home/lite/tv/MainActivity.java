@@ -281,6 +281,7 @@ public class MainActivity extends Activity {
     protected void onPause() {
         resumed = false;
         handler.removeCallbacks(rotatePicture);
+        handler.removeCallbacks(sleepTick);
         unregisterReceiver(timeReceiver);
         stopDrift();
         super.onPause();
@@ -1011,11 +1012,23 @@ public class MainActivity extends Activity {
         m.show();
     }
 
+    /** Подпись таймера сна идёт сама, пока лаунчер на экране: 15 → 14 → … → «45 сек». */
+    private final Runnable sleepTick = new Runnable() {
+        @Override public void run() { updateSleepPill(); }
+    };
+
     private void updateSleepPill() {
         if (sleepPill == null) return;
-        int left = SleepTimer.minutesLeft(this);
-        sleepPill.setLabel(left > 0 ? left + " мин" : null);
+        handler.removeCallbacks(sleepTick);
+        long left = SleepTimer.msLeft(this);
+        sleepPill.setLabel(SleepTimer.label(this));
+        sleepPill.setProgress(SleepTimer.fraction(this));
         sleepPill.setVisibility(prefs.on(Prefs.SLEEP_BTN, true) || left > 0 ? View.VISIBLE : View.GONE);
+        if (left > 0 && resumed) {
+            // Следующий раз — когда сменится цифра, но не реже раза в 5 секунд, чтобы кольцо таяло плавно
+            long step = left > 60_000 ? (left - 1) % 60_000 + 1 : (left - 1) % 1000 + 1;
+            handler.postDelayed(sleepTick, Math.min(step + 20, 5_000L));
+        }
     }
 
     /** Есть ли скачанное обновление — проверка подписи читает APK, поэтому не в UI-потоке. */

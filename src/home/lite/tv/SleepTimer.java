@@ -17,10 +17,27 @@ public class SleepTimer extends BroadcastReceiver {
     static final int[] STEPS = {15, 30, 60, 90, 120};
     private static final String WARN = "home.lite.tv.SLEEP_WARN", SLEEP = "home.lite.tv.SLEEP";
 
-    /** Сколько минут осталось (0 — таймер выключен). */
+    /** Сколько миллисекунд осталось (0 — таймер выключен). */
+    static long msLeft(Context c) {
+        return Math.max(0, new Prefs(c).time(Prefs.SLEEP_AT) - System.currentTimeMillis());
+    }
+
+    /** Сколько минут осталось, с округлением вверх: 15 → через 5 минут 10 (0 — таймер выключен). */
     static int minutesLeft(Context c) {
-        long left = new Prefs(c).time(Prefs.SLEEP_AT) - System.currentTimeMillis();
-        return left > 0 ? (int) ((left + 59_999) / 60_000) : 0;
+        return (int) ((msLeft(c) + 59_999) / 60_000);
+    }
+
+    /** Подпись у луны: «10 мин», в последнюю минуту — «45 сек». */
+    static String label(Context c) {
+        long left = msLeft(c);
+        if (left <= 0) return null;
+        return left > 60_000 ? minutesLeft(c) + " мин" : (left + 999) / 1000 + " сек";
+    }
+
+    /** Какая доля времени ещё осталась: 1 — только что включили, 0 — пора спать (-1 — неизвестно). */
+    static float fraction(Context c) {
+        long len = new Prefs(c).time(Prefs.SLEEP_LEN), left = msLeft(c);
+        return len > 0 && left > 0 ? Math.min(1f, left / (float) len) : -1f;
     }
 
     /** Следующий шаг по кнопке: выкл → 15 → 30 → 60 → 90 → 120 → выкл. */
@@ -44,6 +61,7 @@ public class SleepTimer extends BroadcastReceiver {
         }
         long end = System.currentTimeMillis() + minutes * 60_000L;
         prefs.putTime(Prefs.SLEEP_AT, end);
+        prefs.putTime(Prefs.SLEEP_LEN, minutes * 60_000L);
         at(am, end - 60_000L, pi(c, WARN));
         at(am, end, pi(c, SLEEP));
         Journal.i("таймер сна: " + minutes + " мин");

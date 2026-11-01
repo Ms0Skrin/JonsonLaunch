@@ -129,6 +129,8 @@ final class Widgets {
         static final int MIC = 0, GEAR = 1, WIFI = 2, ETHERNET = 3, OFFLINE = 4, MOON = 5, UPDATE = 6, INPUT = 7;
         private int icon;
         private String label;
+        /** Кольцо вокруг луны — сколько осталось от таймера сна (меньше 0 — кольца нет). */
+        private float progress = -1f;
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint ink = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -162,9 +164,18 @@ final class Widgets {
             super.onMeasure(w, h);
             if (icon == MOON || icon == UPDATE || icon == INPUT) {
                 int hh = getMeasuredHeight();
-                int ww = label == null ? hh : Math.round(hh / 2f + 17 * d + ink.measureText(label) + 14 * d);
+                float gap = icon == MOON && progress >= 0 ? 4 * d : 0;
+                int ww = label == null ? hh : Math.round(hh / 2f + 17 * d + gap + ink.measureText(label) + 14 * d);
                 setMeasuredDimension(ww, hh);
             }
+        }
+
+        void setProgress(float p) {
+            if (p == progress) return;
+            // Кольцо появилось или пропало — пилюля чуть меняет ширину
+            if ((p >= 0) != (progress >= 0)) requestLayout();
+            progress = p;
+            invalidate();
         }
 
         void setIcon(int i) {
@@ -201,10 +212,24 @@ final class Widgets {
                 c.drawText(label, mx + 13 * d, my - (ink.descent() + ink.ascent()) / 2f, ink);
             } else if (icon == MOON || icon == UPDATE || icon == INPUT) {
                 float ix = label == null ? getWidth() / 2f : r + 2 * d;
-                if (icon == MOON) drawMoon(c, ix, my, d, ink);
-                else if (icon == INPUT) drawInput(c, ix, my, d, ink, stroke);
+                float tx = 15 * d;
+                if (icon == MOON) {
+                    if (progress >= 0) {
+                        // Тусклая дорожка и яркая дуга: дуга тает по часовой стрелке, пока идёт таймер
+                        ix += 2 * d;
+                        tx += 2 * d;
+                        float rr = 12.5f * d;
+                        RectF ring = new RectF(ix - rr, my - rr, ix + rr, my + rr);
+                        int a = stroke.getAlpha();
+                        stroke.setAlpha(a / 4);
+                        c.drawArc(ring, 0, 360, false, stroke);
+                        stroke.setAlpha(a);
+                        c.drawArc(ring, -90 + 360 * (1 - progress), 360 * progress, false, stroke);
+                    }
+                    drawMoon(c, ix, my, d, ink);
+                } else if (icon == INPUT) drawInput(c, ix, my, d, ink, stroke);
                 else drawUpdate(c, ix, my, d, stroke);
-                if (label != null) c.drawText(label, ix + 15 * d, my - (ink.descent() + ink.ascent()) / 2f, ink);
+                if (label != null) c.drawText(label, ix + tx, my - (ink.descent() + ink.ascent()) / 2f, ink);
             } else if (icon == GEAR) {
                 drawGear(c, getWidth() / 2f, my, 9 * d, ink);
             } else if (icon == ETHERNET) {
