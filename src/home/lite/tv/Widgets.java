@@ -126,7 +126,7 @@ final class Widgets {
 
     /** Полупрозрачная «пилюля» в верхней строке; в фокусе становится белой, как в tvOS. */
     static final class Pill extends View {
-        static final int MIC = 0, GEAR = 1, WIFI = 2, ETHERNET = 3, OFFLINE = 4, MOON = 5, UPDATE = 6;
+        static final int MIC = 0, GEAR = 1, WIFI = 2, ETHERNET = 3, OFFLINE = 4, MOON = 5, UPDATE = 6, INPUT = 7;
         private int icon;
         private String label;
         private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -160,7 +160,7 @@ final class Widgets {
         @Override
         protected void onMeasure(int w, int h) {
             super.onMeasure(w, h);
-            if (icon == MOON || icon == UPDATE) {
+            if (icon == MOON || icon == UPDATE || icon == INPUT) {
                 int hh = getMeasuredHeight();
                 int ww = label == null ? hh : Math.round(hh / 2f + 17 * d + ink.measureText(label) + 14 * d);
                 setMeasuredDimension(ww, hh);
@@ -199,9 +199,11 @@ final class Widgets {
                 c.drawArc(new RectF(mx - 6.5f * d, my - 5 * d, mx + 6.5f * d, my + 5.5f * d), 20, 140, false, stroke);
                 c.drawLine(mx, my + 5.5f * d, mx, my + 8.5f * d, stroke);
                 c.drawText(label, mx + 13 * d, my - (ink.descent() + ink.ascent()) / 2f, ink);
-            } else if (icon == MOON || icon == UPDATE) {
+            } else if (icon == MOON || icon == UPDATE || icon == INPUT) {
                 float ix = label == null ? getWidth() / 2f : r + 2 * d;
-                if (icon == MOON) drawMoon(c, ix, my, d, ink); else drawUpdate(c, ix, my, d, stroke);
+                if (icon == MOON) drawMoon(c, ix, my, d, ink);
+                else if (icon == INPUT) drawInput(c, ix, my, d, ink, stroke);
+                else drawUpdate(c, ix, my, d, stroke);
                 if (label != null) c.drawText(label, ix + 15 * d, my - (ink.descent() + ink.ascent()) / 2f, ink);
             } else if (icon == GEAR) {
                 drawGear(c, getWidth() / 2f, my, 9 * d, ink);
@@ -230,6 +232,15 @@ final class Widgets {
         c.drawLine(cx - 8 * d, cy + 3 * d, cx - 8 * d, cy + 8 * d, line);
         c.drawLine(cx - 8 * d, cy + 8 * d, cx + 8 * d, cy + 8 * d, line);
         c.drawLine(cx + 8 * d, cy + 8 * d, cx + 8 * d, cy + 3 * d, line);
+    }
+
+    /** Вход: экран на ножке со стрелкой внутрь. */
+    static void drawInput(Canvas c, float cx, float cy, float d, Paint fill, Paint line) {
+        c.drawRoundRect(new RectF(cx - 8 * d, cy - 7 * d, cx + 8 * d, cy + 4 * d), 2 * d, 2 * d, line);
+        c.drawLine(cx - 4 * d, cy + 8 * d, cx + 4 * d, cy + 8 * d, line);
+        c.drawLine(cx - 4 * d, cy - 1.5f * d, cx + 2 * d, cy - 1.5f * d, line);
+        c.drawLine(cx - 0.5f * d, cy - 4 * d, cx + 2 * d, cy - 1.5f * d, line);
+        c.drawLine(cx - 0.5f * d, cy + 1 * d, cx + 2 * d, cy - 1.5f * d, line);
     }
 
     /** Wi‑Fi: точка и три дуги веером вверх; без сети — дуги бледнее и перечёркнуты. */

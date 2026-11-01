@@ -109,7 +109,7 @@ public class MainActivity extends Activity {
     private ImageView artView, washBack, washFront;
     private FrameLayout washBox, content;
     private View topBar, gridBg;
-    private Widgets.Pill searchPill, netPill, sleepPill, updatePill;
+    private Widgets.Pill searchPill, netPill, sleepPill, updatePill, inputPill;
     private TextView title, clock, date, caption, netBadge, quoteText, quoteAuthor;
     private LinearLayout quoteBox;
     private String[] quote;
@@ -213,6 +213,7 @@ public class MainActivity extends Activity {
         artView.post(new Runnable() { @Override public void run() { drift(); } });
         rotatePicture.run();
         updateSleepPill();
+        updateInputPill();
         refreshUpdatePill();
         // Тихая проверка обновлений: скачается сейчас, поставится, когда лаунчер уйдёт с экрана
         if (prefs.on(Prefs.AUTO_UPDATE, true)
@@ -418,6 +419,14 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(-2, px(38));
         mlp.leftMargin = px(12);
         pills.addView(sleepPill, mlp);
+        // Входы HDMI: OK — список портов, подключённые сверху
+        inputPill = new Widgets.Pill(this, Widgets.Pill.INPUT, "Вход");
+        inputPill.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { openInputMenu(); }
+        });
+        LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(-2, px(38));
+        ilp.leftMargin = px(12);
+        pills.addView(inputPill, ilp);
         // Скачано обновление: OK — поставить сразу, не дожидаясь выключения ТВ
         updatePill = new Widgets.Pill(this, Widgets.Pill.UPDATE, "Обновить");
         updatePill.setVisibility(View.GONE);
@@ -588,6 +597,7 @@ public class MainActivity extends Activity {
         date.setVisibility(prefs.on(Prefs.DATE, true) ? View.VISIBLE : View.GONE);
         searchPill.setVisibility(prefs.on(Prefs.SEARCH, true) ? View.VISIBLE : View.GONE);
         updateSleepPill();
+        updateInputPill();
         boolean quotes = Prefs.QUOTE_MS[prefs.pick(Prefs.QUOTES, Prefs.QUOTE_DEF, Prefs.QUOTE_MS.length)] >= 0;
         quoteBox.setVisibility(quotes ? View.VISIBLE : View.GONE);
         if (quotes && quote == null) nextQuote();
@@ -973,6 +983,32 @@ public class MainActivity extends Activity {
             } catch (ActivityNotFoundException ignored) {
             }
         }
+    }
+
+    private void updateInputPill() {
+        if (inputPill == null) return;
+        boolean show = prefs.on(Prefs.INPUT_BTN, true) && !Inputs.hdmi(this).isEmpty();
+        if (!show && inputPill.isFocused()) searchPill.requestFocus();
+        inputPill.setVisibility(show ? View.VISIBLE : View.GONE);
+    }
+
+    private void openInputMenu() {
+        if (appMenu != null || panel != null) return;
+        List<Inputs.In> list = Inputs.hdmi(this);
+        if (list.isEmpty()) return;
+        final AppMenu m = new AppMenu(this, "ИСТОЧНИК", inputPill);
+        List<Inputs.In> sorted = new ArrayList<>();
+        for (Inputs.In x : list) if (x.connected) sorted.add(x);
+        for (Inputs.In x : list) if (!x.connected) sorted.add(x);
+        for (final Inputs.In x : sorted) {
+            m.add(x.connected ? x.label + "  ●  подключено" : x.label + "  ·  пусто", new Runnable() {
+                @Override public void run() { closeAppMenu(); Inputs.open(MainActivity.this, x.id); }
+            });
+        }
+        appMenu = m;
+        content.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
+        ((ViewGroup) content.getParent()).addView(m, match());
+        m.show();
     }
 
     private void updateSleepPill() {

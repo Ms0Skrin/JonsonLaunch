@@ -171,6 +171,7 @@ final class SettingsPanel extends FrameLayout {
         choice("Цитаты", Prefs.QUOTES, Prefs.QUOTE_NAMES, Prefs.QUOTE_DEF);
         toggle("Значок «нет сети»", Prefs.NET, true);
         toggle("Кнопка таймера сна", Prefs.SLEEP_BTN, true);
+        toggle("Кнопка «Вход» (HDMI)", Prefs.INPUT_BTN, true);
         toggle("Плавное появление", Prefs.INTRO, true);
 
         section("Звук");
